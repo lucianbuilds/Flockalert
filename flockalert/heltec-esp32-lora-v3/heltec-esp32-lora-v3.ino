@@ -8,6 +8,7 @@
 #include "coordinates.h"
 #include "configportal.h"
 
+
 // ============================================================
 // GLOBALS USED BY CONFIGPORTAL.H
 // ============================================================
@@ -52,7 +53,7 @@ unsigned long lastGPSStatusPrint = 0;
 
 
 // ============================================================
-// FORWARD DECLARATIONS
+// FUNCTION DECLARATIONS
 // ============================================================
 
 bool gpsDataUsable();
@@ -63,9 +64,99 @@ int findClosestWaypoint(
   double &closestDistance
 );
 
+void initializeOLED();
+
 void updateDisplay();
+
 void checkCoordinates();
+
 void printGPSInfo();
+
+
+// ============================================================
+// OLED INITIALIZATION
+// ============================================================
+
+void initializeOLED() {
+
+  // ----------------------------------------------------------
+  // TURN ON VEXT
+  // ----------------------------------------------------------
+  //
+  // Heltec V3 uses GPIO36 for Vext control.
+  // LOW = VEXT ON.
+  //
+
+  pinMode(
+    VEXT_PIN,
+    OUTPUT
+  );
+
+  digitalWrite(
+    VEXT_PIN,
+    LOW
+  );
+
+  // Give the OLED power rail time to come up.
+  delay(100);
+
+
+  // ----------------------------------------------------------
+  // OLED RESET
+  // ----------------------------------------------------------
+
+  pinMode(
+    OLED_RESET_PIN,
+    OUTPUT
+  );
+
+  digitalWrite(
+    OLED_RESET_PIN,
+    LOW
+  );
+
+  delay(20);
+
+  digitalWrite(
+    OLED_RESET_PIN,
+    HIGH
+  );
+
+  delay(20);
+
+
+  // ----------------------------------------------------------
+  // I2C
+  // ----------------------------------------------------------
+
+  Wire.begin(
+    OLED_SDA_PIN,
+    OLED_SCL_PIN
+  );
+
+
+  // ----------------------------------------------------------
+  // SSD1306
+  // ----------------------------------------------------------
+
+  if (!display.begin(
+        SSD1306_SWITCHCAPVCC,
+        OLED_ADDRESS
+      )) {
+
+    Serial.println(
+      "ERROR: OLED initialization failed!"
+    );
+
+    while (true) {
+      delay(1000);
+    }
+  }
+
+  Serial.println(
+    "Heltec OLED initialized."
+  );
+}
 
 
 // ============================================================
@@ -109,9 +200,11 @@ int findClosestWaypoint(
 
   int closestIndex = -1;
 
-  for (size_t i = 0;
-       i < WAYPOINT_COUNT;
-       i++) {
+  for (
+    size_t i = 0;
+    i < WAYPOINT_COUNT;
+    i++
+  ) {
 
     double distance =
       TinyGPSPlus::distanceBetween(
@@ -148,6 +241,7 @@ void checkCoordinates() {
   double longitude =
     gps.location.lng();
 
+
   double closestDistance;
 
   int closest =
@@ -161,48 +255,78 @@ void checkCoordinates() {
     return;
   }
 
+
+  // ----------------------------------------------------------
+  // CONVERT CONFIGURED FEET TO METERS
+  // ----------------------------------------------------------
+
   const double alertDistanceMeters =
-    runtimeSettings.alertDistanceFeet * 0.3048;
+    runtimeSettings.alertDistanceFeet *
+    0.3048;
 
   const double clearDistanceMeters =
-    runtimeSettings.alertClearDistanceFeet * 0.3048;
+    runtimeSettings.alertClearDistanceFeet *
+    0.3048;
 
 
   // ==========================================================
   // ENTER ALERT ZONE
   // ==========================================================
 
-  if (!alertActive &&
-      closestDistance <= alertDistanceMeters) {
+  if (
+    !alertActive &&
+    closestDistance <= alertDistanceMeters
+  ) {
 
     alertActive = true;
 
     activeWaypoint = closest;
 
-    // Count this ALPR pass.
+
+    // Count one ALPR pass.
     noteAlprPassed();
 
-    Serial.println();
-    Serial.println("================================");
-    Serial.println("         FLOCK DETECTED");
-    Serial.println("================================");
 
-    Serial.print("Location: ");
+    Serial.println();
+    Serial.println(
+      "================================"
+    );
+
+    Serial.println(
+      "         FLOCK DETECTED"
+    );
+
+    Serial.println(
+      "================================"
+    );
+
+
+    Serial.print(
+      "Location: "
+    );
 
     Serial.println(
       waypoints[closest].name
     );
 
-    Serial.print("Distance: ");
+
+    Serial.print(
+      "Distance: "
+    );
 
     Serial.print(
       closestDistance * 3.2808399,
       1
     );
 
-    Serial.println(" ft");
+    Serial.println(
+      " ft"
+    );
 
-    Serial.print("Speed: ");
+
+    Serial.print(
+      "Speed: "
+    );
 
     if (gps.speed.isValid()) {
 
@@ -213,44 +337,61 @@ void checkCoordinates() {
 
     } else {
 
-      Serial.print("--");
+      Serial.print(
+        "--"
+      );
     }
 
-    Serial.println(" MPH");
+    Serial.println(
+      " MPH"
+    );
 
-    Serial.print("ALPRs passed: ");
+
+    Serial.print(
+      "ALPRs passed: "
+    );
 
     Serial.println(
       alprs_passed
     );
 
-    Serial.println("================================");
+
+    Serial.println(
+      "================================"
+    );
   }
 
 
   // ==========================================================
-  // ALREADY IN ALERT ZONE
+  // ACTIVE ALERT
   // ==========================================================
 
   if (alertActive) {
 
-    // If another ALPR becomes the nearest one while still
-    // inside an alert zone, treat entering that new zone as
-    // another pass.
 
-    if (closest != activeWaypoint &&
-        closestDistance <= alertDistanceMeters) {
+    // --------------------------------------------------------
+    // ANOTHER COORDINATE BECOMES NEAREST
+    // --------------------------------------------------------
+
+    if (
+      closest != activeWaypoint &&
+      closestDistance <= alertDistanceMeters
+    ) {
 
       activeWaypoint = closest;
 
       noteAlprPassed();
 
+
       Serial.println();
+
       Serial.println(
-        "Another ALPR alert zone entered."
+        "Another ALPR zone entered."
       );
 
-      Serial.print("Location: ");
+      Serial.print(
+        "Location: "
+      );
 
       Serial.println(
         waypoints[closest].name
@@ -259,15 +400,18 @@ void checkCoordinates() {
 
 
     // --------------------------------------------------------
-    // Leave alert zone
+    // LEAVE ALERT ZONE
     // --------------------------------------------------------
 
-    if (closestDistance >
-        clearDistanceMeters) {
+    if (
+      closestDistance >
+      clearDistanceMeters
+    ) {
 
       alertActive = false;
 
       activeWaypoint = -1;
+
 
       Serial.println(
         "Left alert area."
@@ -278,7 +422,7 @@ void checkCoordinates() {
 
 
 // ============================================================
-// OLED DISPLAY
+// OLED UPDATE
 // ============================================================
 
 void updateDisplay() {
@@ -291,24 +435,34 @@ void updateDisplay() {
 
 
   // ==========================================================
-  // GPS NOT READY
+  // WAITING FOR GPS
   // ==========================================================
 
   if (!gpsDataUsable()) {
 
     display.setTextSize(2);
 
-    display.setCursor(0, 0);
+    display.setCursor(
+      0,
+      0
+    );
 
-    display.println("GPS");
+    display.println(
+      "GPS"
+    );
+
 
     display.setTextSize(1);
 
-    display.setCursor(0, 24);
+    display.setCursor(
+      0,
+      24
+    );
 
     display.println(
       "Waiting for fix..."
     );
+
 
     if (gps.satellites.isValid()) {
 
@@ -326,6 +480,7 @@ void updateDisplay() {
       );
     }
 
+
     display.display();
 
     return;
@@ -333,7 +488,7 @@ void updateDisplay() {
 
 
   // ==========================================================
-  // GPS DATA
+  // CURRENT GPS DATA
   // ==========================================================
 
   double latitude =
@@ -369,11 +524,13 @@ void updateDisplay() {
   // FULL-SCREEN NEAR ALERT
   // ==========================================================
 
-  if (alertActive &&
-      activeWaypoint >= 0) {
+  if (
+    alertActive &&
+    activeWaypoint >= 0
+  ) {
 
     // --------------------------------------------------------
-    // NEAR
+    // LARGE "NEAR"
     // --------------------------------------------------------
 
     const char* alertText =
@@ -381,11 +538,13 @@ void updateDisplay() {
 
     display.setTextSize(4);
 
+
     int16_t x1;
     int16_t y1;
 
     uint16_t w;
     uint16_t h;
+
 
     display.getTextBounds(
       alertText,
@@ -396,6 +555,7 @@ void updateDisplay() {
       &w,
       &h
     );
+
 
     display.setCursor(
       (OLED_WIDTH - w) / 2,
@@ -413,14 +573,17 @@ void updateDisplay() {
 
     display.setTextSize(1);
 
+
     const char* name =
       waypoints[activeWaypoint].name;
+
 
     const int maxNameChars = 21;
 
     char displayName[
       maxNameChars + 1
     ];
+
 
     strncpy(
       displayName,
@@ -432,15 +595,18 @@ void updateDisplay() {
       maxNameChars
     ] = '\0';
 
+
     int nameWidth =
       strlen(displayName) * 6;
 
     int nameX =
       (OLED_WIDTH - nameWidth) / 2;
 
+
     if (nameX < 0) {
       nameX = 0;
     }
+
 
     display.setCursor(
       nameX,
@@ -465,7 +631,9 @@ void updateDisplay() {
       speedMPH
     );
 
+
     display.setTextSize(2);
+
 
     display.getTextBounds(
       speedText,
@@ -477,6 +645,7 @@ void updateDisplay() {
       &h
     );
 
+
     display.setCursor(
       (OLED_WIDTH - w) / 2,
       48
@@ -485,6 +654,7 @@ void updateDisplay() {
     display.print(
       speedText
     );
+
 
     display.display();
 
@@ -509,15 +679,18 @@ void updateDisplay() {
     speedMPH
   );
 
+
   display.setTextSize(
     runtimeSettings.speedTextSize
   );
+
 
   int16_t x1;
   int16_t y1;
 
   uint16_t w;
   uint16_t h;
+
 
   display.getTextBounds(
     speedText,
@@ -529,8 +702,10 @@ void updateDisplay() {
     &h
   );
 
+
   int speedX =
     (OLED_WIDTH - w) / 2;
+
 
   display.setCursor(
     speedX,
@@ -559,7 +734,7 @@ void updateDisplay() {
 
 
   // ----------------------------------------------------------
-  // NEAREST ALPR
+  // NEAREST ALPR DISTANCE
   // ----------------------------------------------------------
 
   display.setCursor(
@@ -570,6 +745,7 @@ void updateDisplay() {
   display.print(
     "Nearest: "
   );
+
 
   if (closest >= 0) {
 
@@ -591,7 +767,7 @@ void updateDisplay() {
 
 
   // ----------------------------------------------------------
-  // COORDINATES
+  // COMPACT COORDINATES
   // ----------------------------------------------------------
 
   display.setCursor(
@@ -599,33 +775,39 @@ void updateDisplay() {
     53
   );
 
+
   display.print(
     latitude,
     runtimeSettings.coordinateDecimals
   );
 
+
   display.print(
     ","
   );
+
 
   display.print(
     longitude,
     runtimeSettings.coordinateDecimals
   );
 
+
   display.display();
 }
 
 
 // ============================================================
-// GPS DEBUG OUTPUT
+// SERIAL GPS DEBUG
 // ============================================================
 
 void printGPSInfo() {
 
-  if (millis() -
-      lastGPSStatusPrint <
-      1000) {
+  if (
+    millis() -
+    lastGPSStatusPrint <
+    1000
+  ) {
 
     return;
   }
@@ -633,9 +815,11 @@ void printGPSInfo() {
   lastGPSStatusPrint =
     millis();
 
+
   Serial.print(
     "GPS: "
   );
+
 
   if (gps.location.isValid()) {
 
@@ -665,6 +849,7 @@ void printGPSInfo() {
     " | Speed: "
   );
 
+
   if (gps.speed.isValid()) {
 
     Serial.print(
@@ -688,6 +873,7 @@ void printGPSInfo() {
     " | Satellites: "
   );
 
+
   if (gps.satellites.isValid()) {
 
     Serial.print(
@@ -705,6 +891,7 @@ void printGPSInfo() {
   Serial.print(
     " | ALPRs passed: "
   );
+
 
   Serial.println(
     alprs_passed
@@ -728,6 +915,7 @@ void setup() {
 
   delay(500);
 
+
   Serial.println();
 
   Serial.println(
@@ -735,7 +923,7 @@ void setup() {
   );
 
   Serial.println(
-    "       GPS ALERT SYSTEM"
+    "   HELTEC GPS ALERT SYSTEM"
   );
 
   Serial.println(
@@ -754,15 +942,11 @@ void setup() {
 
 
   // ----------------------------------------------------------
-  // LOAD PERSISTENT SETTINGS
+  // LOAD SAVED SETTINGS
   // ----------------------------------------------------------
 
   loadPersistentConfig();
 
-
-  // ----------------------------------------------------------
-  // PRINT SETTINGS
-  // ----------------------------------------------------------
 
   Serial.print(
     "GPS baud: "
@@ -771,6 +955,7 @@ void setup() {
   Serial.println(
     runtimeSettings.gpsBaud
   );
+
 
   Serial.print(
     "Alert distance: "
@@ -785,6 +970,7 @@ void setup() {
     " ft"
   );
 
+
   Serial.print(
     "Clear distance: "
   );
@@ -797,6 +983,7 @@ void setup() {
   Serial.println(
     " ft"
   );
+
 
   Serial.print(
     "ALPRs passed: "
@@ -818,41 +1005,25 @@ void setup() {
     GPS_TX_PIN
   );
 
-  Serial.println(
-    "GPS UART initialized."
+
+  Serial.print(
+    "GPS RX: GPIO"
   );
-
-
-  // ----------------------------------------------------------
-  // OLED I2C
-  // ----------------------------------------------------------
-
-  Wire.begin(
-    OLED_SDA_PIN,
-    OLED_SCL_PIN
-  );
-
-  if (!display.begin(
-        SSD1306_SWITCHCAPVCC,
-        OLED_ADDRESS
-      )) {
-
-    Serial.println(
-      "ERROR: OLED initialization failed!"
-    );
-
-    while (true) {
-      delay(1000);
-    }
-  }
 
   Serial.println(
-    "OLED initialized."
+    GPS_RX_PIN
   );
 
 
   // ----------------------------------------------------------
-  // STARTUP SCREEN
+  // OLED
+  // ----------------------------------------------------------
+
+  initializeOLED();
+
+
+  // ----------------------------------------------------------
+  // STARTUP DISPLAY
   // ----------------------------------------------------------
 
   display.clearDisplay();
@@ -860,6 +1031,7 @@ void setup() {
   display.setTextColor(
     SSD1306_WHITE
   );
+
 
   display.setTextSize(2);
 
@@ -872,6 +1044,7 @@ void setup() {
     "GPS"
   );
 
+
   display.setTextSize(1);
 
   display.setCursor(
@@ -882,6 +1055,7 @@ void setup() {
   display.println(
     "Coordinate Alert"
   );
+
 
   display.setCursor(
     0,
@@ -896,6 +1070,7 @@ void setup() {
     WAYPOINT_COUNT
   );
 
+
   display.setCursor(
     0,
     52
@@ -909,7 +1084,9 @@ void setup() {
     alprs_passed
   );
 
+
   display.display();
+
 
   delay(1500);
 
@@ -932,6 +1109,7 @@ void setup() {
     " coordinates."
   );
 
+
   Serial.println(
     "Waiting for GPS fix..."
   );
@@ -945,14 +1123,14 @@ void setup() {
 void loop() {
 
   // ----------------------------------------------------------
-  // BOOT BUTTON
+  // BOOT BUTTON / CONFIG MODE
   // ----------------------------------------------------------
 
   checkBootButton();
 
 
   // ----------------------------------------------------------
-  // CONFIGURATION WEB SERVER
+  // WEB SERVER
   // ----------------------------------------------------------
 
   handleConfigPortal();
@@ -962,7 +1140,9 @@ void loop() {
   // GPS
   // ----------------------------------------------------------
 
-  while (GPS_Serial.available()) {
+  while (
+    GPS_Serial.available()
+  ) {
 
     gps.encode(
       GPS_Serial.read()
@@ -974,7 +1154,9 @@ void loop() {
   // POSITION CHECK
   // ----------------------------------------------------------
 
-  if (gps.location.isUpdated()) {
+  if (
+    gps.location.isUpdated()
+  ) {
 
     checkCoordinates();
   }
@@ -991,9 +1173,11 @@ void loop() {
   // OLED
   // ----------------------------------------------------------
 
-  if (millis() -
-      lastDisplayUpdate >=
-      runtimeSettings.displayUpdateMs) {
+  if (
+    millis() -
+    lastDisplayUpdate >=
+    runtimeSettings.displayUpdateMs
+  ) {
 
     lastDisplayUpdate =
       millis();

@@ -2,21 +2,21 @@
 #define CONFIG_H
 
 // ============================================================
-// GPS
+// DEFAULT GPS PINS
 // ============================================================
 
-constexpr int GPS_RX_PIN = 23;
-constexpr int GPS_TX_PIN = -1;
+constexpr int DEFAULT_GPS_RX_PIN = 23;
+constexpr int DEFAULT_GPS_TX_PIN = -1;   // -1 = unused
 
 constexpr uint32_t DEFAULT_GPS_BAUD = 9600;
 
 
 // ============================================================
-// OLED
+// DEFAULT OLED PINS
 // ============================================================
 
-constexpr int OLED_SDA_PIN = 21;
-constexpr int OLED_SCL_PIN = 22;
+constexpr int DEFAULT_SCREEN_SDA_PIN = 21;
+constexpr int DEFAULT_SCREEN_SCL_PIN = 22;
 
 constexpr uint8_t OLED_ADDRESS = 0x3C;
 
@@ -25,27 +25,24 @@ constexpr int OLED_HEIGHT = 64;
 
 
 // ============================================================
-// FUTURE SPEAKER
+// DEFAULT SPEAKER PIN
 // ============================================================
+// Reserved for the future speaker/audio upgrade.
 
-// Reserved for the future audio upgrade.
-// Not currently used.
-
-constexpr int SPEAKER_PIN = 25;
+constexpr int DEFAULT_SPEAKER_PIN = 25;
 
 
 // ============================================================
-// BOOT BUTTON / CONFIGURATION MODE
+// BOOT BUTTON
 // ============================================================
 
 // Standard ESP32 DevKit BOOT button.
 constexpr int BOOT_BUTTON_PIN = 0;
 
-// Button debounce.
-constexpr unsigned long BOOT_DEBOUNCE_MS = 50;
+// Hold BOOT this long to enter configuration mode.
+constexpr unsigned long BOOT_HOLD_TIME_MS = 3000;
 
-// Three presses must occur within this amount of time.
-constexpr unsigned long CONFIG_TRIPLE_PRESS_WINDOW_MS = 10000;
+constexpr unsigned long BOOT_DEBOUNCE_MS = 50;
 
 
 // ============================================================
@@ -53,28 +50,34 @@ constexpr unsigned long CONFIG_TRIPLE_PRESS_WINDOW_MS = 10000;
 // ============================================================
 
 constexpr const char* CONFIG_AP_SSID =
-  "Config-alpr-detector";
+  "GPS-ALPR-Config";
 
 constexpr const char* CONFIG_AP_PASSWORD =
-  "12345678";
+  "gpsconfig";
 
-// Wi-Fi channel used by the configuration AP.
 constexpr uint8_t CONFIG_AP_CHANNEL = 1;
 
-// Maximum devices connected to the configuration AP.
 constexpr uint8_t CONFIG_AP_MAX_CONNECTIONS = 2;
 
 
 // ============================================================
-// DEFAULT PROXIMITY SETTINGS
+// DEFAULT NORMAL ALERT SETTINGS
 // ============================================================
 
-// Alert when within 50 feet.
 constexpr double DEFAULT_ALERT_DISTANCE_FEET = 50.0;
 
-// Alert clears after getting farther than 75 feet.
-// This prevents GPS jitter around the 50-foot boundary.
 constexpr double DEFAULT_ALERT_CLEAR_DISTANCE_FEET = 75.0;
+
+
+// ============================================================
+// HIGHWAY MODE
+// ============================================================
+
+// Highway mode activates when speed is ABOVE this value.
+constexpr double DEFAULT_HIGHWAY_SPEED_MPH = 45.0;
+
+// Alert distance while highway mode is active.
+constexpr double DEFAULT_HIGHWAY_ALERT_DISTANCE_FEET = 150.0;
 
 
 // ============================================================
@@ -90,7 +93,7 @@ constexpr int DEFAULT_SPEED_TEXT_SIZE = 4;
 
 
 // ============================================================
-// DEFAULT GPS QUALITY SETTINGS
+// GPS QUALITY
 // ============================================================
 
 // 0 = no minimum satellite requirement.
