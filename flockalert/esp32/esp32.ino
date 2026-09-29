@@ -60,6 +60,8 @@ unsigned long lastGPSStatusPrint = 0;
 
 bool gpsDataUsable();
 
+bool highwayModeActive();
+
 int findClosestWaypoint(
   double latitude,
   double longitude,
@@ -135,6 +137,18 @@ bool gpsDataUsable() {
 
 
   return true;
+}
+
+
+// ============================================================
+// HIGHWAY MODE
+// ============================================================
+
+bool highwayModeActive() {
+
+  return gps.speed.isValid() &&
+    gps.speed.mph() >
+      runtimeSettings.highwaySpeedMph;
 }
 
 
@@ -219,13 +233,36 @@ void checkCoordinates() {
   }
 
 
+  bool highwayMode =
+    highwayModeActive();
+
+  double alertDistanceFeet =
+    highwayMode
+    ? runtimeSettings.highwayAlertDistanceFeet
+    : runtimeSettings.alertDistanceFeet;
+
   double alertDistanceMeters =
-    runtimeSettings.alertDistanceFeet *
+    alertDistanceFeet *
     0.3048;
 
 
+  // Keep an alert active until its own detection area has been
+  // left. This avoids an immediate clear when the highway radius
+  // is larger than the normal clear distance.
+  double activeAlertDistanceFeet =
+    (highwayMode ||
+     alertStartedInHighwayMode)
+    ? runtimeSettings.highwayAlertDistanceFeet
+    : runtimeSettings.alertDistanceFeet;
+
+  double clearDistanceFeet =
+    max(
+      runtimeSettings.alertClearDistanceFeet,
+      activeAlertDistanceFeet
+    );
+
   double clearDistanceMeters =
-    runtimeSettings.alertClearDistanceFeet *
+    clearDistanceFeet *
     0.3048;
 
 
@@ -243,6 +280,9 @@ void checkCoordinates() {
 
     activeWaypoint =
       closest;
+
+    alertStartedInHighwayMode =
+      highwayMode;
 
 
     noteAlprPassed();
@@ -327,6 +367,8 @@ void checkCoordinates() {
       alertActive = false;
 
       activeWaypoint = -1;
+
+      alertStartedInHighwayMode = false;
 
       Serial.println(
         "Left alert area."
@@ -491,6 +533,9 @@ void updateDisplay() {
     gps.speed.isValid()
     ? gps.speed.mph()
     : 0.0;
+
+  bool highwayMode =
+    highwayModeActive();
 
 
   // ==========================================================
@@ -742,6 +787,13 @@ void updateDisplay() {
     display.print(
       "ft"
     );
+
+    if (highwayMode) {
+
+      display.print(
+        " HWY"
+      );
+    }
 
   } else {
 

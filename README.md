@@ -1,2 +1,206 @@
-# Flockalert
+# ESP32 GPS Coordinate Alert
 
+A portable ESP32 GPS proximity-alert device. It reads position and speed from a u-blox GPS receiver, compares the current position with a bundled coordinate database, and shows an alert on a 128 x 64 OLED display when a stored location is nearby.
+
+The device also works as a compact GPS speedometer and has a built-in Wi-Fi configuration page, so common settings can be changed without rebuilding the firmware.
+
+> Use this project responsibly and in accordance with local laws, road-safety rules, and privacy expectations. It is an informational aid, not a substitute for attentive driving.
+
+<!-- Add your build photo at docs/images/device-build.jpg, then remove this comment:
+![Completed ESP32 GPS Coordinate Alert device](docs/images/device-build.jpg)
+-->
+
+## Features
+
+- Live GPS speed in MPH
+- Nearest stored coordinate and current latitude/longitude
+- Visual proximity alert when within the configured alert distance
+- Persistent `ALPRs passed` counter stored in ESP32 non-volatile storage
+- Wi-Fi configuration portal started by holding the BOOT button
+- Configurable GPS, OLED, and speaker GPIO assignments
+- Configurable GPS baud rate, satellite requirement, alert distances, and display options
+- Large coordinate database kept separate from the main sketch
+
+## Hardware
+
+| Part | Default connection | Notes |
+| --- | --- | --- |
+| ESP32 DevKit | - | Standard ESP32 development board |
+| u-blox GPS TX | GPIO 23 | Connects to the ESP32 GPS receive pin |
+| u-blox GPS RX | Not connected | Default firmware setting is `-1` (unused) |
+| SSD1306 OLED SDA | GPIO 21 | I2C data |
+| SSD1306 OLED SCL | GPIO 22 | I2C clock |
+| Speaker | GPIO 25 | Reserved; audio alerts are not implemented yet |
+| BOOT button | GPIO 0 | Hold for 3 seconds to open configuration mode |
+
+Power the GPS and OLED from the voltage appropriate for your specific modules. Make sure all modules share a common ground.
+
+<!-- Add a clear wiring photo at docs/images/wiring.jpg, then remove this comment:
+![ESP32, GPS, and OLED wiring](docs/images/wiring.jpg)
+-->
+
+## Project Layout
+
+```text
+Flockalert/
+├── README.md
+├── flockalert/
+│   └── esp32/
+│       ├── esp32.ino        Main firmware: GPS, display, and proximity checks
+│       ├── coordinates.h    Stored coordinate database
+│       ├── config.h         Factory/default settings
+│       └── configportal.h   Wi-Fi portal, saved settings, and counter storage
+└── docs/
+    └── images/              Optional README photos
+```
+
+## Before You Upload
+
+Install the Arduino IDE, then add ESP32 board support through the Board Manager. Select your ESP32 board, usually **ESP32 Dev Module** for a standard DevKit.
+
+Install these libraries through the Arduino Library Manager:
+
+- `TinyGPSPlus`
+- `Adafruit GFX Library`
+- `Adafruit SSD1306`
+
+Open [esp32.ino](C:/Users/offic/Documents/GitHub/Flockalert/flockalert/esp32/esp32.ino) in the Arduino IDE and upload it to the board. The three header files in the same folder are included automatically by the sketch.
+
+If your board needs BOOT held while uploading, hold it only until the upload begins, then release it.
+
+## Normal Operation
+
+At startup, the OLED shows the number of loaded coordinate entries and the saved counter. Once the GPS has a usable position, the normal display shows:
+
+```text
+      37.4
+       MPH
+
+Nearest: 218ft
+37.80451,-122.27123
+```
+
+- **Speed** comes from the GPS receiver and is shown in miles per hour.
+- **Nearest** is the straight-line distance to the closest entry in `coordinates.h`.
+- **Coordinates** are the current GPS latitude and longitude.
+- If a minimum satellite count is configured, the device waits until that requirement is met before using a GPS position.
+
+## Proximity Alerts
+
+Each time the GPS position updates, the firmware compares it with every stored coordinate using `TinyGPSPlus::distanceBetween()`.
+
+When the closest coordinate is inside the alert radius, the normal screen is replaced by an alert screen:
+
+```text
+       NEAR
+
+    Flock Safety ALPR
+
+      32.7 MPH
+```
+
+The firmware remembers the active coordinate while you are in the alert area. It increments `ALPRs passed` when entering an alert, and can increment again only if a different closest coordinate becomes active. The alert clears after the nearest coordinate is farther away than the configured clear distance.
+
+The counter is stored in ESP32 non-volatile storage, so it remains after power-off or restart. It can be reset from the configuration page.
+
+## Wi-Fi Configuration
+
+1. Power on the device.
+2. Hold the ESP32 **BOOT** button for 3 seconds.
+3. On a phone or computer, join the Wi-Fi network:
+
+   | Setting | Value |
+   | --- | --- |
+   | Network name | `GPS-ALPR-Config` |
+   | Password | `gpsconfig` |
+   | Configuration address | `http://192.168.4.1` |
+
+4. Open `http://192.168.4.1` in a browser.
+5. Change the settings you need, then choose **Save & Restart**.
+
+The device stays in configuration mode until it restarts. Saved settings are restored automatically on future boots.
+
+<!-- Add a configuration-page screenshot at docs/images/config-page.png, then remove this comment:
+![Wi-Fi configuration page](docs/images/config-page.png)
+-->
+
+### Available Settings
+
+| Group | Settings |
+| --- | --- |
+| Pins | GPS RX, GPS TX, OLED SDA, OLED SCL, speaker |
+| GPS | Baud rate and minimum satellites |
+| Alerts | Normal alert distance, alert clear distance, Highway Mode speed, and highway alert distance |
+| Display | OLED refresh interval, coordinate decimals, speed text size |
+| Maintenance | Reset the counter or restore all defaults |
+
+The portal rejects duplicate GPIO assignments among the GPS, OLED, and speaker connections. A GPS TX setting of `-1` leaves the ESP32 transmit pin unused.
+
+## Adding or Updating Coordinates
+
+Edit [coordinates.h](C:/Users/offic/Documents/GitHub/Flockalert/flockalert/esp32/coordinates.h). Each entry has a display name, latitude, and longitude:
+
+```cpp
+{ "Flock Safety ALPR", 37.782190, -122.219840 },
+```
+
+Add entries inside the `waypoints[]` list, separated with commas, then upload the sketch again. The firmware calculates `WAYPOINT_COUNT` automatically.
+
+Keep coordinates in decimal degrees. Latitude is listed first, followed by longitude.
+
+## Default Settings
+
+| Setting | Default |
+| --- | --- |
+| GPS receive GPIO | 23 |
+| GPS transmit GPIO | Disabled (`-1`) |
+| GPS baud rate | 9600 |
+| OLED SDA / SCL | GPIO 21 / GPIO 22 |
+| OLED I2C address | `0x3C` |
+| Speaker GPIO | 25 |
+| Alert distance | 50 ft |
+| Alert clear distance | 75 ft |
+| Minimum satellites | 0 (no minimum) |
+| Display refresh interval | 250 ms |
+| Coordinate precision | 5 decimal places |
+| Speed text size | 4 |
+
+The factory defaults live in [config.h](C:/Users/offic/Documents/GitHub/Flockalert/flockalert/esp32/config.h). Settings changed through the Wi-Fi page override these defaults until the device is reset to defaults.
+
+## Highway Mode
+
+Highway Mode automatically activates when GPS speed is **above** the configured threshold. It uses the configured highway alert distance and adds `HWY` to the normal OLED display.
+
+The default behavior is:
+
+| Speed | Alert distance |
+| --- | --- |
+| 45 MPH or below | 50 ft |
+| Above 45 MPH | 150 ft |
+
+An alert that begins in Highway Mode stays active until the device has moved beyond the highway radius or the configured clear distance, whichever is greater. This prevents an alert from turning off immediately when the highway radius is larger than the normal clear distance.
+
+## Troubleshooting
+
+| Symptom | Things to check |
+| --- | --- |
+| OLED stays blank | Confirm SDA, SCL, power, ground, and the OLED I2C address (`0x3C` by default). |
+| `Waiting for fix...` remains on screen | Move the GPS antenna outdoors with a clear view of the sky. Confirm GPS TX is connected to ESP32 GPIO 23 and that the baud rate matches the receiver. |
+| Speed or position is wrong | Give the GPS time to acquire satellites; configure a minimum satellite value if you want the firmware to ignore weak fixes. |
+| No proximity alerts | Verify the coordinate format, make sure the point is within the alert distance, and confirm that a valid GPS location is displayed. |
+| Configuration network does not appear | Hold BOOT for the full 3 seconds. The OLED should show the Wi-Fi name and address. |
+| Settings did not change | Save from the Wi-Fi page and wait for the ESP32 to restart. |
+
+## Photo Checklist
+
+The README is ready for these images. Attach them in chat and I can place them, resize/crop them if needed, and activate the matching image sections.
+
+- `device-build.jpg`: completed device, front or three-quarter view
+- `wiring.jpg`: ESP32, GPS, OLED, power, and ground connections clearly visible
+- `config-page.png`: browser view of the Wi-Fi configuration page
+
+See [docs/images/README.md](C:/Users/offic/Documents/GitHub/Flockalert/docs/images/README.md) for the expected folder and filenames.
+
+## Current Scope
+
+This firmware is focused on GPS location, speed display, coordinate proximity alerts, persistent settings, and the standalone configuration portal. GPIO 25 is reserved for a future speaker feature; no tone, MP3, or SD-card audio code is included at present.

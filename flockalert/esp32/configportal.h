@@ -715,6 +715,32 @@ String makeConfigPage() {
 
   page += F(
     "'>"
+
+    "<label>Highway mode speed (MPH)</label>"
+    "<input name='hwyspeed' type='number' "
+    "step='0.1' min='1' max='200' value='"
+  );
+
+  page += String(
+    runtimeSettings.highwaySpeedMph,
+    1
+  );
+
+  page += F(
+    "'>"
+
+    "<label>Highway alert distance (feet)</label>"
+    "<input name='hwyalert' type='number' "
+    "step='0.1' min='1' max='5000' value='"
+  );
+
+  page += String(
+    runtimeSettings.highwayAlertDistanceFeet,
+    1
+  );
+
+  page += F(
+    "'>"
     "</div>"
   );
 
@@ -838,6 +864,8 @@ void handleConfigSave() {
     "sats",
     "alert",
     "clear",
+    "hwyspeed",
+    "hwyalert",
     "disp",
     "coord",
     "speed"
@@ -908,6 +936,16 @@ void handleConfigSave() {
   double clear =
     configServer.arg(
       "clear"
+    ).toDouble();
+
+  double highwaySpeed =
+    configServer.arg(
+      "hwyspeed"
+    ).toDouble();
+
+  double highwayAlert =
+    configServer.arg(
+      "hwyalert"
     ).toDouble();
 
   uint32_t disp =
@@ -1036,6 +1074,32 @@ void handleConfigSave() {
   }
 
 
+  if (highwaySpeed <= 0 ||
+      highwaySpeed > 200) {
+
+    configServer.send(
+      400,
+      "text/plain",
+      "Invalid highway speed."
+    );
+
+    return;
+  }
+
+
+  if (highwayAlert < 1 ||
+      highwayAlert > 5000) {
+
+    configServer.send(
+      400,
+      "text/plain",
+      "Invalid highway alert distance."
+    );
+
+    return;
+  }
+
+
   if (disp < 50 ||
       disp > 2000) {
 
@@ -1105,6 +1169,12 @@ void handleConfigSave() {
 
   runtimeSettings.alertClearDistanceFeet =
     clear;
+
+  runtimeSettings.highwaySpeedMph =
+    highwaySpeed;
+
+  runtimeSettings.highwayAlertDistanceFeet =
+    highwayAlert;
 
   runtimeSettings.displayUpdateMs =
     disp;
@@ -1197,6 +1267,12 @@ void handleRestoreDefaults() {
 
   runtimeSettings.alertClearDistanceFeet =
     DEFAULT_ALERT_CLEAR_DISTANCE_FEET;
+
+  runtimeSettings.highwaySpeedMph =
+    DEFAULT_HIGHWAY_SPEED_MPH;
+
+  runtimeSettings.highwayAlertDistanceFeet =
+    DEFAULT_HIGHWAY_ALERT_DISTANCE_FEET;
 
   runtimeSettings.displayUpdateMs =
     DEFAULT_DISPLAY_UPDATE_MS;
