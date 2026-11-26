@@ -18,6 +18,8 @@ RuntimeSettings runtimeSettings;
 
 uint32_t alprs_passed = 0;
 
+uint32_t speedcams_passed = 0;
+
 bool configPortalActive = false;
 
 bool alertStartedInHighwayMode = false;
@@ -202,6 +204,34 @@ int findClosestWaypoint(
 
 
 // ============================================================
+// CAMERA TYPE
+// ============================================================
+
+// Entries named "Speed Cam..." (e.g. "Speed Camera", as written by
+// tools/overpass/make-coordinates.ps1) are speed cameras. Everything
+// else is treated as an ALPR.
+bool isSpeedCamera(int index) {
+
+  return index >= 0 &&
+    strncmp(
+      waypoints[index].name,
+      "Speed Cam",
+      9
+    ) == 0;
+}
+
+
+void noteWaypointPassed(int index) {
+
+  if (isSpeedCamera(index)) {
+    noteSpeedCamPassed();
+  } else {
+    noteAlprPassed();
+  }
+}
+
+
+// ============================================================
 // CHECK COORDINATES
 // ============================================================
 
@@ -286,7 +316,10 @@ void checkCoordinates() {
       highwayMode;
 
 
-    noteAlprPassed();
+    bool speedCam =
+      isSpeedCamera(closest);
+
+    noteWaypointPassed(closest);
 
 
     Serial.println();
@@ -295,7 +328,9 @@ void checkCoordinates() {
     );
 
     Serial.println(
-      "         FLOCK DETECTED"
+      speedCam
+      ? "       SPEED CAM DETECTED"
+      : "         FLOCK DETECTED"
     );
 
     Serial.println(
@@ -334,6 +369,14 @@ void checkCoordinates() {
       alprs_passed
     );
 
+    Serial.print(
+      "Speed cams passed: "
+    );
+
+    Serial.println(
+      speedcams_passed
+    );
+
 
     Serial.println(
       "================================"
@@ -356,7 +399,7 @@ void checkCoordinates() {
       activeWaypoint =
         closest;
 
-      noteAlprPassed();
+      noteWaypointPassed(closest);
     }
 
 
@@ -805,8 +848,8 @@ void updateDisplay() {
   }
 
 
-  // Bottom line: alert bar while an ALPR is active (switching off),
-  // otherwise the coordinates.
+  // Bottom line: alert bar while an ALPR or speed camera is active
+  // (switching off), otherwise the coordinates.
 
   if (alertActive && activeWaypoint >= 0) {
 
@@ -829,7 +872,9 @@ void updateDisplay() {
     );
 
     display.print(
-      "ALPR NEAR "
+      isSpeedCamera(activeWaypoint)
+      ? "SPEED CAM "
+      : "ALPR NEAR "
     );
 
     display.print(
@@ -975,8 +1020,16 @@ void printGPSInfo() {
   );
 
 
-  Serial.println(
+  Serial.print(
     alprs_passed
+  );
+
+  Serial.print(
+    " | Speed cams passed: "
+  );
+
+  Serial.println(
+    speedcams_passed
   );
 }
 
@@ -1117,7 +1170,7 @@ void setup() {
 
   display.setCursor(
     0,
-    40
+    36
   );
 
   display.print(
@@ -1131,15 +1184,29 @@ void setup() {
 
   display.setCursor(
     0,
-    52
+    46
   );
 
   display.print(
-    "Passed: "
+    "ALPRs passed: "
   );
 
   display.println(
     alprs_passed
+  );
+
+
+  display.setCursor(
+    0,
+    56
+  );
+
+  display.print(
+    "Speed cams passed: "
+  );
+
+  display.println(
+    speedcams_passed
   );
 
 

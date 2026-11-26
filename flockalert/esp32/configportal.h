@@ -52,6 +52,8 @@ extern RuntimeSettings runtimeSettings;
 
 extern uint32_t alprs_passed;
 
+extern uint32_t speedcams_passed;
+
 extern bool configPortalActive;
 
 extern WebServer configServer;
@@ -134,6 +136,8 @@ void loadPersistentConfig() {
     DEFAULT_HIGHWAY_ALERT_DISTANCE_FEET;
 
   alprs_passed = 0;
+
+  speedcams_passed = 0;
 
 
   // ----------------------------------------------------------
@@ -269,6 +273,12 @@ void loadPersistentConfig() {
   alprs_passed =
     settingsPreferences.getUInt(
       "passed",
+      0
+    );
+
+  speedcams_passed =
+    settingsPreferences.getUInt(
+      "spdpassed",
       0
     );
 
@@ -520,6 +530,37 @@ void noteAlprPassed() {
 
 
 // ============================================================
+// SPEED CAMERA COUNTER
+// ============================================================
+
+void saveSpeedCamCount() {
+
+  settingsPreferences.putUInt(
+    "spdpassed",
+    speedcams_passed
+  );
+}
+
+
+void noteSpeedCamPassed() {
+
+  speedcams_passed++;
+
+  saveSpeedCamCount();
+
+  startChime();
+
+  Serial.print(
+    "Speed cam passed. Total: "
+  );
+
+  Serial.println(
+    speedcams_passed
+  );
+}
+
+
+// ============================================================
 // CONFIG PAGE
 // ============================================================
 
@@ -601,6 +642,27 @@ String makeConfigPage() {
   page += F(
     "<form action='/reset-counter' method='POST'>"
     "<button type='submit'>Reset ALPR Counter</button>"
+    "</form>"
+    "</div>"
+  );
+
+
+  // ----------------------------------------------------------
+  // SPEED CAMERA COUNTER
+  // ----------------------------------------------------------
+
+  page += F(
+    "<div class='card'>"
+    "<b>Speed cams passed:</b> "
+  );
+
+  page += String(
+    speedcams_passed
+  );
+
+  page += F(
+    "<form action='/reset-speed-counter' method='POST'>"
+    "<button type='submit'>Reset Speed Cam Counter</button>"
     "</form>"
     "</div>"
   );
@@ -887,7 +949,7 @@ String makeConfigPage() {
 
   page += F(
     ">"
-    " Play a chime when an ALPR is nearby"
+    " Play a chime when an ALPR or speed camera is nearby"
     "</label>"
 
     "<label>Chime tone</label>"
@@ -1386,6 +1448,31 @@ void handleResetCounter() {
 
 
 // ============================================================
+// RESET SPEED CAMERA COUNTER
+// ============================================================
+
+void handleResetSpeedCounter() {
+
+  speedcams_passed = 0;
+
+  saveSpeedCamCount();
+
+
+  configServer.sendHeader(
+    "Location",
+    "/",
+    true
+  );
+
+  configServer.send(
+    303,
+    "text/plain",
+    ""
+  );
+}
+
+
+// ============================================================
 // RESET TO DEFAULTS
 // ============================================================
 
@@ -1528,6 +1615,12 @@ void startConfigPortal() {
     "/reset-counter",
     HTTP_POST,
     handleResetCounter
+  );
+
+  configServer.on(
+    "/reset-speed-counter",
+    HTTP_POST,
+    handleResetSpeedCounter
   );
 
   configServer.on(

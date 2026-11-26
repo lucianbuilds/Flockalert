@@ -15,7 +15,7 @@ The device also works as a compact GPS speedometer and has a built-in Wi-Fi conf
 - Live GPS speed in MPH
 - Nearest stored coordinate and current latitude/longitude
 - Visual proximity alert when within the configured alert distance
-- Persistent `ALPRs passed` counter stored in ESP32 non-volatile storage
+- Separate persistent `ALPRs passed` and `Speed cams passed` counters stored in ESP32 non-volatile storage
 - Wi-Fi configuration portal started by holding the BOOT button
 - Configurable GPS, OLED, and speaker GPIO assignments
 - Configurable GPS baud rate, satellite requirement, alert distances, and display options
@@ -30,7 +30,7 @@ The device also works as a compact GPS speedometer and has a built-in Wi-Fi conf
 | u-blox GPS RX | Not connected | Default firmware setting is `-1` (unused) |
 | SSD1306 OLED SDA | GPIO 21 | I2C data |
 | SSD1306 OLED SCL | GPIO 22 | I2C clock |
-| Passive piezo buzzer (optional) | GPIO 25 | Plays a chime when an ALPR is nearby; see [Buzzer Chimes](#buzzer-chimes) |
+| Passive piezo buzzer (optional) | GPIO 25 | Plays a chime when an ALPR or speed camera is nearby; see [Buzzer Chimes](#buzzer-chimes) |
 | BOOT button | GPIO 0 | Hold for 3 seconds to open configuration mode |
 
 Power the GPS and OLED from the voltage appropriate for your specific modules. Make sure all modules share a common ground.
@@ -100,15 +100,15 @@ When the closest coordinate is inside the alert radius, and **Switch to full-scr
       32.7 MPH
 ```
 
-With **Switch to full-screen alert** turned off, the speed screen stays visible and the bottom line becomes an inverted bar such as `ALPR NEAR 120ft`. Speed stays readable at all times.
+With **Switch to full-screen alert** turned off, the speed screen stays visible and the bottom line becomes an inverted bar such as `ALPR NEAR 120ft`, or `SPEED CAM 120ft` for a speed camera. Speed stays readable at all times.
 
-The firmware remembers the active coordinate while you are in the alert area. It increments `ALPRs passed` when entering an alert, and can increment again only if a different closest coordinate becomes active. The alert clears after the nearest coordinate is farther away than the configured clear distance.
+The firmware remembers the active coordinate while you are in the alert area. It increments `ALPRs passed` (or `Speed cams passed` for entries whose name starts with `Speed Cam`) when entering an alert, and can increment again only if a different closest coordinate becomes active. The alert clears after the nearest coordinate is farther away than the configured clear distance.
 
 The counter is stored in ESP32 non-volatile storage, so it remains after power-off or restart. It can be reset from the configuration page.
 
 ## Buzzer Chimes
 
-Turn on **Play a chime when an ALPR is nearby** on the Wi-Fi configuration page to get an audible alert. Pick one of four tones under **Chime tone**:
+Turn on **Play a chime when an ALPR or speed camera is nearby** on the Wi-Fi configuration page to get an audible alert. Pick one of four tones under **Chime tone**:
 
 | Tone | Sound |
 | --- | --- |
@@ -151,7 +151,7 @@ The device stays in configuration mode until it restarts. Saved settings are res
 | Alerts | Normal alert distance, alert clear distance, Highway Mode speed, and highway alert distance |
 | Display | OLED refresh interval, coordinate decimals, speed text size, switch to full-screen alert |
 | Buzzer | Enable chime, chime tone |
-| Maintenance | Reset the counter or restore all defaults |
+| Maintenance | Reset the ALPR or speed cam counter, or restore all defaults |
 
 The portal rejects duplicate GPIO assignments among the GPS, OLED, and speaker connections. A GPS TX setting of `-1` leaves the ESP32 transmit pin unused.
 
@@ -166,6 +166,20 @@ Edit [coordinates.h](flockalert/esp32/coordinates.h). Each entry has a display n
 Add entries inside the `waypoints[]` list, separated with commas, then upload the sketch again. The firmware calculates `WAYPOINT_COUNT` automatically.
 
 Keep coordinates in decimal degrees. Latitude is listed first, followed by longitude.
+
+### Regenerating from OpenStreetMap
+
+[cameras.overpassql](tools/overpass/cameras.overpassql) pulls ALPRs (the cameras DeFlock maps) and speed cameras from OpenStreetMap:
+
+1. Paste the query into [Overpass Turbo](https://overpass-turbo.eu), move the map to your area, and click **Run**.
+2. Save the result: **Export > raw data directly from Overpass API**, or copy the **Data** tab.
+3. Write a new `coordinates.h` from it. This replaces the existing file:
+
+```powershell
+./tools/overpass/make-coordinates.ps1 -InputFile export.csv
+```
+
+Use `-FromClipboard` instead of `-InputFile` if you copied the Data tab. Red-light cameras can be turned on in the query.
 
 ## Default Settings
 
