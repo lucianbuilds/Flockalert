@@ -7,6 +7,7 @@
 #include "config.h"
 #include "coordinates.h"
 #include "configportal.h"
+#include "buzzer.h"
 
 
 // ============================================================
@@ -562,6 +563,7 @@ void updateDisplay() {
   // ==========================================================
 
   if (
+    runtimeSettings.autoScreenSwitch &&
     alertActive &&
     activeWaypoint >= 0
   ) {
@@ -803,29 +805,67 @@ void updateDisplay() {
   }
 
 
-  // Coordinates
+  // Bottom line: alert bar while an ALPR is active (switching off),
+  // otherwise the coordinates.
 
-  display.setCursor(
-    0,
-    53
-  );
+  if (alertActive && activeWaypoint >= 0) {
 
+    // Inverted bar: white background, black text.
+    display.fillRect(
+      0,
+      53,
+      OLED_WIDTH,
+      11,
+      SSD1306_WHITE
+    );
 
-  display.print(
-    latitude,
-    runtimeSettings.coordinateDecimals
-  );
+    display.setTextColor(
+      SSD1306_BLACK
+    );
 
+    display.setCursor(
+      2,
+      54
+    );
 
-  display.print(
-    ","
-  );
+    display.print(
+      "ALPR NEAR "
+    );
 
+    display.print(
+      closestFeet,
+      0
+    );
 
-  display.print(
-    longitude,
-    runtimeSettings.coordinateDecimals
-  );
+    display.print(
+      "ft"
+    );
+
+    display.setTextColor(
+      SSD1306_WHITE
+    );
+
+  } else {
+
+    display.setCursor(
+      0,
+      53
+    );
+
+    display.print(
+      latitude,
+      runtimeSettings.coordinateDecimals
+    );
+
+    display.print(
+      ","
+    );
+
+    display.print(
+      longitude,
+      runtimeSettings.coordinateDecimals
+    );
+  }
 
 
   display.display();
@@ -1161,6 +1201,13 @@ void loop() {
   // ----------------------------------------------------------
 
   printGPSInfo();
+
+
+  // ----------------------------------------------------------
+  // BUZZER CHIME
+  // ----------------------------------------------------------
+
+  updateBuzzer();
 
 
   // ----------------------------------------------------------

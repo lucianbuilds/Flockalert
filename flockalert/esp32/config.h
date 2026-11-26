@@ -91,6 +91,30 @@ constexpr int DEFAULT_COORDINATE_DECIMALS = 5;
 // 4 = very large speed display.
 constexpr int DEFAULT_SPEED_TEXT_SIZE = 4;
 
+// true = switch to the full-screen NEAR alert screen when an ALPR is close.
+// false = stay on the speed screen and show a small alert bar instead.
+constexpr bool DEFAULT_AUTO_SCREEN_SWITCH = false;
+
+
+// ============================================================
+// BUZZER
+// ============================================================
+
+constexpr bool DEFAULT_BUZZER_ENABLED = false;
+
+// Index into CHIME_TONE_NAMES below.
+constexpr int DEFAULT_CHIME_TONE = 0;
+
+constexpr int CHIME_TONE_COUNT = 4;
+
+// Names shown on the configuration page. Sequences live in buzzer.h.
+constexpr const char* CHIME_TONE_NAMES[CHIME_TONE_COUNT] = {
+  "Two-tone",
+  "Rising",
+  "Warble",
+  "Quick beep"
+};
+
 
 // ============================================================
 // GPS QUALITY

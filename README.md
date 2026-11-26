@@ -30,7 +30,7 @@ The device also works as a compact GPS speedometer and has a built-in Wi-Fi conf
 | u-blox GPS RX | Not connected | Default firmware setting is `-1` (unused) |
 | SSD1306 OLED SDA | GPIO 21 | I2C data |
 | SSD1306 OLED SCL | GPIO 22 | I2C clock |
-| Speaker | GPIO 25 | Reserved; audio alerts are not implemented yet |
+| Passive piezo buzzer (optional) | GPIO 25 | Plays a chime when an ALPR is nearby; see [Buzzer Chimes](#buzzer-chimes) |
 | BOOT button | GPIO 0 | Hold for 3 seconds to open configuration mode |
 
 Power the GPS and OLED from the voltage appropriate for your specific modules. Make sure all modules share a common ground.
@@ -48,6 +48,7 @@ Flockalert/
 │   └── esp32/
 │       ├── esp32.ino        Main firmware: GPS, display, and proximity checks
 │       ├── coordinates.h    Stored coordinate database
+│       ├── buzzer.h         Chime sequences and buzzer playback
 │       ├── config.h         Factory/default settings
 │       └── configportal.h   Wi-Fi portal, saved settings, and counter storage
 └── docs/
@@ -64,7 +65,7 @@ Install these libraries through the Arduino Library Manager:
 - `Adafruit GFX Library`
 - `Adafruit SSD1306`
 
-Open [esp32.ino](C:/Users/offic/Documents/GitHub/Flockalert/flockalert/esp32/esp32.ino) in the Arduino IDE and upload it to the board. The three header files in the same folder are included automatically by the sketch.
+Open [esp32.ino](flockalert/esp32/esp32.ino) in the Arduino IDE and upload it to the board. The three header files in the same folder are included automatically by the sketch.
 
 If your board needs BOOT held while uploading, hold it only until the upload begins, then release it.
 
@@ -89,7 +90,7 @@ Nearest: 218ft
 
 Each time the GPS position updates, the firmware compares it with every stored coordinate using `TinyGPSPlus::distanceBetween()`.
 
-When the closest coordinate is inside the alert radius, the normal screen is replaced by an alert screen:
+When the closest coordinate is inside the alert radius, and **Switch to full-screen alert** is enabled, the normal screen is replaced by an alert screen:
 
 ```text
        NEAR
@@ -99,9 +100,26 @@ When the closest coordinate is inside the alert radius, the normal screen is rep
       32.7 MPH
 ```
 
+With **Switch to full-screen alert** turned off, the speed screen stays visible and the bottom line becomes an inverted bar such as `ALPR NEAR 120ft`. Speed stays readable at all times.
+
 The firmware remembers the active coordinate while you are in the alert area. It increments `ALPRs passed` when entering an alert, and can increment again only if a different closest coordinate becomes active. The alert clears after the nearest coordinate is farther away than the configured clear distance.
 
 The counter is stored in ESP32 non-volatile storage, so it remains after power-off or restart. It can be reset from the configuration page.
+
+## Buzzer Chimes
+
+Turn on **Play a chime when an ALPR is nearby** on the Wi-Fi configuration page to get an audible alert. Pick one of four tones under **Chime tone**:
+
+| Tone | Sound |
+| --- | --- |
+| Two-tone | Two descending notes |
+| Rising | Four rising notes |
+| Warble | Alternating high and low notes |
+| Quick beep | Two short high beeps |
+
+The chime plays each time a new alert starts, or when a different ALPR becomes the closest one in range. It does not repeat while you stay in the same alert area.
+
+Use a **passive** piezo buzzer, which needs a signal to make sound. Connect its positive lead to GPIO 25 and its negative lead to GND. An **active** buzzer makes one fixed tone, so it sounds the same for every tone choice.
 
 ## Wi-Fi Configuration
 
@@ -128,17 +146,18 @@ The device stays in configuration mode until it restarts. Saved settings are res
 
 | Group | Settings |
 | --- | --- |
-| Pins | GPS RX, GPS TX, OLED SDA, OLED SCL, speaker |
+| Pins | GPS RX, GPS TX, OLED SDA, OLED SCL, buzzer |
 | GPS | Baud rate and minimum satellites |
 | Alerts | Normal alert distance, alert clear distance, Highway Mode speed, and highway alert distance |
-| Display | OLED refresh interval, coordinate decimals, speed text size |
+| Display | OLED refresh interval, coordinate decimals, speed text size, switch to full-screen alert |
+| Buzzer | Enable chime, chime tone |
 | Maintenance | Reset the counter or restore all defaults |
 
 The portal rejects duplicate GPIO assignments among the GPS, OLED, and speaker connections. A GPS TX setting of `-1` leaves the ESP32 transmit pin unused.
 
 ## Adding or Updating Coordinates
 
-Edit [coordinates.h](C:/Users/offic/Documents/GitHub/Flockalert/flockalert/esp32/coordinates.h). Each entry has a display name, latitude, and longitude:
+Edit [coordinates.h](flockalert/esp32/coordinates.h). Each entry has a display name, latitude, and longitude:
 
 ```cpp
 { "Flock Safety ALPR", 37.782190, -122.219840 },
@@ -157,15 +176,18 @@ Keep coordinates in decimal degrees. Latitude is listed first, followed by longi
 | GPS baud rate | 9600 |
 | OLED SDA / SCL | GPIO 21 / GPIO 22 |
 | OLED I2C address | `0x3C` |
-| Speaker GPIO | 25 |
+| Buzzer / speaker GPIO | 25 |
 | Alert distance | 50 ft |
 | Alert clear distance | 75 ft |
 | Minimum satellites | 0 (no minimum) |
 | Display refresh interval | 250 ms |
 | Coordinate precision | 5 decimal places |
 | Speed text size | 4 |
+| Switch to full-screen alert | Off |
+| Buzzer chime | Off |
+| Chime tone | Two-tone |
 
-The factory defaults live in [config.h](C:/Users/offic/Documents/GitHub/Flockalert/flockalert/esp32/config.h). Settings changed through the Wi-Fi page override these defaults until the device is reset to defaults.
+The factory defaults live in [config.h](flockalert/esp32/config.h). Settings changed through the Wi-Fi page override these defaults until the device is reset to defaults.
 
 ## Highway Mode
 
@@ -191,16 +213,6 @@ An alert that begins in Highway Mode stays active until the device has moved bey
 | Configuration network does not appear | Hold BOOT for the full 3 seconds. The OLED should show the Wi-Fi name and address. |
 | Settings did not change | Save from the Wi-Fi page and wait for the ESP32 to restart. |
 
-## Photo Checklist
-
-The README is ready for these images. Attach them in chat and I can place them, resize/crop them if needed, and activate the matching image sections.
-
-- `device-build.jpg`: completed device, front or three-quarter view
-- `wiring.jpg`: ESP32, GPS, OLED, power, and ground connections clearly visible
-- `config-page.png`: browser view of the Wi-Fi configuration page
-
-See [docs/images/README.md](C:/Users/offic/Documents/GitHub/Flockalert/docs/images/README.md) for the expected folder and filenames.
-
 ## Current Scope
 
-This firmware is focused on GPS location, speed display, coordinate proximity alerts, persistent settings, and the standalone configuration portal. GPIO 25 is reserved for a future speaker feature; no tone, MP3, or SD-card audio code is included at present.
+This firmware is focused on GPS location, speed display, coordinate proximity alerts, persistent settings, and the standalone configuration portal. GPIO 25 drives the optional passive buzzer for chimes. MP3 and SD-card audio are not included.

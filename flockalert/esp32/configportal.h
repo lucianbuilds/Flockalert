@@ -36,6 +36,11 @@ struct RuntimeSettings {
   int speedTextSize;
 
   int minSatellites;
+
+  bool autoScreenSwitch;
+
+  bool buzzerEnabled;
+  int chimeTone;
 };
 
 
@@ -112,6 +117,15 @@ void loadPersistentConfig() {
 
   runtimeSettings.minSatellites =
     DEFAULT_MIN_SATELLITES;
+
+  runtimeSettings.autoScreenSwitch =
+    DEFAULT_AUTO_SCREEN_SWITCH;
+
+  runtimeSettings.buzzerEnabled =
+    DEFAULT_BUZZER_ENABLED;
+
+  runtimeSettings.chimeTone =
+    DEFAULT_CHIME_TONE;
 
   runtimeSettings.highwaySpeedMph =
   DEFAULT_HIGHWAY_SPEED_MPH;
@@ -226,6 +240,31 @@ void loadPersistentConfig() {
       "minsats",
       DEFAULT_MIN_SATELLITES
     );
+
+  runtimeSettings.autoScreenSwitch =
+    settingsPreferences.getBool(
+      "autosw",
+      DEFAULT_AUTO_SCREEN_SWITCH
+    );
+
+  runtimeSettings.buzzerEnabled =
+    settingsPreferences.getBool(
+      "buzzen",
+      DEFAULT_BUZZER_ENABLED
+    );
+
+  runtimeSettings.chimeTone =
+    settingsPreferences.getInt(
+      "chime",
+      DEFAULT_CHIME_TONE
+    );
+
+  if (runtimeSettings.chimeTone < 0 ||
+      runtimeSettings.chimeTone >= CHIME_TONE_COUNT) {
+
+    runtimeSettings.chimeTone =
+      DEFAULT_CHIME_TONE;
+  }
 
   alprs_passed =
     settingsPreferences.getUInt(
@@ -424,6 +463,21 @@ void savePersistentConfig() {
     runtimeSettings.minSatellites
   );
 
+  settingsPreferences.putBool(
+    "autosw",
+    runtimeSettings.autoScreenSwitch
+  );
+
+  settingsPreferences.putBool(
+    "buzzen",
+    runtimeSettings.buzzerEnabled
+  );
+
+  settingsPreferences.putInt(
+    "chime",
+    runtimeSettings.chimeTone
+  );
+
 
   Serial.println(
     "Settings saved."
@@ -444,11 +498,16 @@ void saveAlprCount() {
 }
 
 
+void startChime();
+
+
 void noteAlprPassed() {
 
   alprs_passed++;
 
   saveAlprCount();
+
+  startChime();
 
   Serial.print(
     "ALPR passed. Total: "
@@ -489,6 +548,8 @@ String makeConfigPage() {
     "button{padding:12px 18px;margin:5px 0;"
     "font-size:16px;}"
     ".danger{background:#eee;}"
+    ".chk{display:flex;align-items:center;gap:8px;}"
+    ".chk input{width:auto;margin:0;}"
     "</style>"
     "</head>"
     "<body>"
@@ -610,7 +671,7 @@ String makeConfigPage() {
   page += F(
     "'>"
 
-    "<label>Speaker pin</label>"
+    "<label>Buzzer pin (speaker)</label>"
     "<input name='speaker' type='number' "
     "min='0' max='39' value='"
   );
@@ -788,6 +849,19 @@ String makeConfigPage() {
 
   page += F(
     "'>"
+
+    "<label class='chk'>"
+    "<input type='checkbox' name='autosw' value='1'"
+  );
+
+  if (runtimeSettings.autoScreenSwitch) {
+    page += " checked";
+  }
+
+  page += F(
+    ">"
+    " Switch to full-screen alert (off = show alert bar)"
+    "</label>"
     "</div>"
   );
 
@@ -795,6 +869,51 @@ String makeConfigPage() {
   // ----------------------------------------------------------
   // SAVE
   // ----------------------------------------------------------
+
+  // ----------------------------------------------------------
+  // BUZZER SETTINGS
+  // ----------------------------------------------------------
+
+  page += F(
+    "<div class='card'>"
+    "<h3>Buzzer</h3>"
+    "<label class='chk'>"
+    "<input type='checkbox' name='buzz' value='1'"
+  );
+
+  if (runtimeSettings.buzzerEnabled) {
+    page += " checked";
+  }
+
+  page += F(
+    ">"
+    " Play a chime when an ALPR is nearby"
+    "</label>"
+
+    "<label>Chime tone</label>"
+    "<select name='chime'>"
+  );
+
+  for (int i = 0; i < CHIME_TONE_COUNT; i++) {
+
+    page += "<option value='";
+    page += String(i);
+
+    if (runtimeSettings.chimeTone == i) {
+      page += "' selected>";
+    } else {
+      page += "'>";
+    }
+
+    page += CHIME_TONE_NAMES[i];
+    page += "</option>";
+  }
+
+  page += F(
+    "</select>"
+    "</div>"
+  );
+
 
   page += F(
     "<button type='submit'>"
@@ -1126,6 +1245,24 @@ void handleConfigSave() {
   }
 
 
+  int chime =
+    configServer.arg(
+      "chime"
+    ).toInt();
+
+  if (chime < 0 ||
+      chime >= CHIME_TONE_COUNT) {
+
+    configServer.send(
+      400,
+      "text/plain",
+      "Invalid chime tone."
+    );
+
+    return;
+  }
+
+
   if (speed < 1 ||
       speed > 4) {
 
@@ -1184,6 +1321,16 @@ void handleConfigSave() {
 
   runtimeSettings.speedTextSize =
     speed;
+
+  // Unchecked checkboxes are not sent by the browser, so absence = off.
+  runtimeSettings.autoScreenSwitch =
+    configServer.hasArg("autosw");
+
+  runtimeSettings.buzzerEnabled =
+    configServer.hasArg("buzz");
+
+  runtimeSettings.chimeTone =
+    chime;
 
 
   // ----------------------------------------------------------
@@ -1285,6 +1432,15 @@ void handleRestoreDefaults() {
 
   runtimeSettings.minSatellites =
     DEFAULT_MIN_SATELLITES;
+
+  runtimeSettings.autoScreenSwitch =
+    DEFAULT_AUTO_SCREEN_SWITCH;
+
+  runtimeSettings.buzzerEnabled =
+    DEFAULT_BUZZER_ENABLED;
+
+  runtimeSettings.chimeTone =
+    DEFAULT_CHIME_TONE;
 
 
   savePersistentConfig();
