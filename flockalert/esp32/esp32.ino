@@ -520,7 +520,9 @@ void updateDisplay() {
     );
 
     display.println(
-      "Wifi enabled"
+      setupComplete()
+      ? "Wifi enabled"
+      : "SETUP: join this Wi-Fi"
     );
 
 
@@ -1190,6 +1192,9 @@ void setup() {
 
   loadCameraDatabase();
 
+  // First boot: open the setup portal right away.
+  bool firstBoot = !setupComplete();
+
 
   // ----------------------------------------------------------
   // GPS
@@ -1325,6 +1330,11 @@ void setup() {
 
 
   delay(1500);
+
+  if (firstBoot) {
+    Serial.println("First boot: starting setup portal.");
+    startConfigPortal();
+  }
 }
 
 

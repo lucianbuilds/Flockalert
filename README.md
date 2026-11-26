@@ -57,7 +57,7 @@ Flockalert/
 
 ## Before You Upload
 
-Install the Arduino IDE, then add ESP32 board support through the Board Manager. Select your ESP32 board, usually **ESP32 Dev Module** for a standard DevKit.
+Install the Arduino IDE, then add ESP32 board support through the Board Manager. Select your ESP32 board, usually **ESP32 Dev Module** for a standard DevKit. Then set **Tools > Partition Scheme** to **Huge APP (3MB No OTA/1MB SPIFFS)**. The firmware no longer fits the default scheme, and the larger file-storage area holds downloaded camera data.
 
 Install these libraries through the Arduino Library Manager:
 
@@ -180,6 +180,20 @@ Keep coordinates in decimal degrees. Latitude is listed first, followed by longi
 ```
 
 Use `-FromClipboard` instead of `-InputFile` if you copied the Data tab. Red-light cameras can be turned on in the query.
+
+### First-boot setup
+
+On first boot the device opens its setup Wi-Fi automatically and the OLED shows `SETUP: join this Wi-Fi` with the network name and password. Join it from your phone. The setup page should open by itself (captive portal); if it doesn't, browse to `http://192.168.4.1`. Download cameras for your area, then press **Save**. Setup is marked done after either a successful download or a save.
+
+### Downloading cameras over Wi-Fi
+
+On the configuration page, **Download Cameras** asks for:
+
+- An internet Wi-Fi name and password, such as home Wi-Fi or a phone hotspot (saved for next time)
+- A city and state/province
+- A search radius in miles (1-100)
+
+The device joins that network while keeping its own Wi-Fi up, queries the Overpass API for ALPRs and speed cameras within the radius of that city, and saves the result as its camera database. Your phone may briefly drop off the device's Wi-Fi during the download; rejoin it if needed. The result appears at the top of the Download Cameras card. Large radii around big cities can time out; use a smaller radius if that happens.
 
 ### Uploading camera data over Wi-Fi
 

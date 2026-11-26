@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <WebServer.h>
+#include <DNSServer.h>
 #include <Preferences.h>
 
 #include "config.h"
@@ -75,6 +76,12 @@ extern bool configPortalActive;
 extern WebServer configServer;
 
 extern Preferences settingsPreferences;
+
+#include "download.h"
+
+// Answers every DNS lookup with the portal's address, so phones
+// detect a captive portal and open the setup page automatically.
+DNSServer captiveDns;
 
 
 // ============================================================
@@ -649,6 +656,9 @@ String makeConfigPage() {
     "<br>Address: http://192.168.4.1"
     "</div>"
   );
+
+
+  page += makeCameraDownloadCard();
 
 
   // ----------------------------------------------------------
@@ -1468,6 +1478,8 @@ void handleConfigSave() {
   runtimeSettings.chimeTone =
     chime;
 
+  markSetupComplete();
+
 
   // ----------------------------------------------------------
   // Save
@@ -1708,6 +1720,12 @@ void startConfigPortal() {
   );
 
   configServer.on(
+    "/download-cameras",
+    HTTP_POST,
+    handleCameraDownloadRequest
+  );
+
+  configServer.on(
     "/reset-cameras",
     HTTP_POST,
     handleCameraReset
@@ -1720,12 +1738,16 @@ void startConfigPortal() {
   );
 
 
+  captiveDns.start(53, "*", WiFi.softAPIP());
+
+  // Unknown paths, including phone captive-portal checks, go to the
+  // setup page. An absolute URL is needed for the captive popup.
   configServer.onNotFound(
     []() {
 
       configServer.sendHeader(
         "Location",
-        "/",
+        "http://" + WiFi.softAPIP().toString() + "/",
         true
       );
 
@@ -1904,7 +1926,11 @@ void handleConfigPortal() {
     return;
   }
 
+  captiveDns.processNextRequest();
+
   configServer.handleClient();
+
+  handleCameraDownloadLoop();
 }
 
 #endif
