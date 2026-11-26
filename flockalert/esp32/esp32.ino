@@ -156,6 +156,66 @@ bool highwayModeActive() {
 
 
 // ============================================================
+// DISTANCE TEXT
+// ============================================================
+
+// Writes a distance for the display, e.g. "350ft", "1.2mi",
+// "107m", "3.4km". Switches from ft/m to mi/km above
+// DISTANCE_SWITCH_FEET, using the units chosen in the config portal.
+void formatDistance(
+  double feet,
+  char* out,
+  size_t outSize
+) {
+
+  bool longDistance =
+    feet > DISTANCE_SWITCH_FEET;
+
+  if (runtimeSettings.metricUnits) {
+
+    double meters =
+      feet * 0.3048;
+
+    if (longDistance) {
+
+      double km =
+        meters / 1000.0;
+
+      snprintf(
+        out,
+        outSize,
+        km < 100.0 ? "%.1fkm" : "%.0fkm",
+        km
+      );
+
+    } else {
+
+      snprintf(out, outSize, "%.0fm", meters);
+    }
+
+  } else {
+
+    if (longDistance) {
+
+      double miles =
+        feet / 5280.0;
+
+      snprintf(
+        out,
+        outSize,
+        miles < 100.0 ? "%.1fmi" : "%.0fmi",
+        miles
+      );
+
+    } else {
+
+      snprintf(out, outSize, "%.0fft", feet);
+    }
+  }
+}
+
+
+// ============================================================
 // FIND CLOSEST COORDINATE
 // ============================================================
 
@@ -822,15 +882,19 @@ void updateDisplay() {
   );
 
 
+  char distanceText[16];
+
+  formatDistance(
+    closestFeet,
+    distanceText,
+    sizeof(distanceText)
+  );
+
+
   if (closest >= 0) {
 
     display.print(
-      closestFeet,
-      0
-    );
-
-    display.print(
-      "ft"
+      distanceText
     );
 
     if (highwayMode) {
@@ -878,12 +942,7 @@ void updateDisplay() {
     );
 
     display.print(
-      closestFeet,
-      0
-    );
-
-    display.print(
-      "ft"
+      distanceText
     );
 
     display.setTextColor(

@@ -95,6 +95,13 @@ constexpr int DEFAULT_SPEED_TEXT_SIZE = 4;
 // false = stay on the speed screen and show a small alert bar instead.
 constexpr bool DEFAULT_AUTO_SCREEN_SWITCH = false;
 
+// Distance units on the display.
+// false = feet, then miles above DISTANCE_SWITCH_FEET.
+// true  = meters, then kilometers above DISTANCE_SWITCH_FEET.
+constexpr bool DEFAULT_METRIC_UNITS = false;
+
+constexpr double DISTANCE_SWITCH_FEET = 2000.0;
+
 
 // ============================================================
 // BUZZER

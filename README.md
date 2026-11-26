@@ -82,7 +82,7 @@ Nearest: 218ft
 ```
 
 - **Speed** comes from the GPS receiver and is shown in miles per hour.
-- **Nearest** is the straight-line distance to the closest entry in `coordinates.h`.
+- **Nearest** is the straight-line distance to the closest entry in `coordinates.h`. It is shown in feet up to 2000 ft and in miles beyond that, or in meters and kilometers if **Distance units** is set to Meters / km.
 - **Coordinates** are the current GPS latitude and longitude.
 - If a minimum satellite count is configured, the device waits until that requirement is met before using a GPS position.
 
@@ -149,7 +149,7 @@ The device stays in configuration mode until it restarts. Saved settings are res
 | Pins | GPS RX, GPS TX, OLED SDA, OLED SCL, buzzer |
 | GPS | Baud rate and minimum satellites |
 | Alerts | Normal alert distance, alert clear distance, Highway Mode speed, and highway alert distance |
-| Display | OLED refresh interval, coordinate decimals, speed text size, switch to full-screen alert |
+| Display | OLED refresh interval, coordinate decimals, speed text size, switch to full-screen alert, distance units (feet / miles or meters / km) |
 | Buzzer | Enable chime, chime tone |
 | Maintenance | Reset the ALPR or speed cam counter, or restore all defaults |
 
@@ -198,7 +198,8 @@ Use `-FromClipboard` instead of `-InputFile` if you copied the Data tab. Red-lig
 | Coordinate precision | 5 decimal places |
 | Speed text size | 4 |
 | Switch to full-screen alert | Off |
-| Buzzer chime | Off |
+| Distance units | Feet / miles |
+| Buzzer chime | On |
 | Chime tone | Two-tone |
 
 The factory defaults live in [config.h](flockalert/esp32/config.h). Settings changed through the Wi-Fi page override these defaults until the device is reset to defaults.

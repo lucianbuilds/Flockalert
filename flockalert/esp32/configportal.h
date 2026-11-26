@@ -39,6 +39,8 @@ struct RuntimeSettings {
 
   bool autoScreenSwitch;
 
+  bool metricUnits;
+
   bool buzzerEnabled;
   int chimeTone;
 };
@@ -122,6 +124,9 @@ void loadPersistentConfig() {
 
   runtimeSettings.autoScreenSwitch =
     DEFAULT_AUTO_SCREEN_SWITCH;
+
+  runtimeSettings.metricUnits =
+    DEFAULT_METRIC_UNITS;
 
   runtimeSettings.buzzerEnabled =
     DEFAULT_BUZZER_ENABLED;
@@ -249,6 +254,12 @@ void loadPersistentConfig() {
     settingsPreferences.getBool(
       "autosw",
       DEFAULT_AUTO_SCREEN_SWITCH
+    );
+
+  runtimeSettings.metricUnits =
+    settingsPreferences.getBool(
+      "metric",
+      DEFAULT_METRIC_UNITS
     );
 
   runtimeSettings.buzzerEnabled =
@@ -476,6 +487,11 @@ void savePersistentConfig() {
   settingsPreferences.putBool(
     "autosw",
     runtimeSettings.autoScreenSwitch
+  );
+
+  settingsPreferences.putBool(
+    "metric",
+    runtimeSettings.metricUnits
   );
 
   settingsPreferences.putBool(
@@ -924,6 +940,28 @@ String makeConfigPage() {
     ">"
     " Switch to full-screen alert (off = show alert bar)"
     "</label>"
+
+    "<label>Distance units</label>"
+    "<select name='units'>"
+    "<option value='0'"
+  );
+
+  if (!runtimeSettings.metricUnits) {
+    page += " selected";
+  }
+
+  page += F(
+    ">Feet / miles</option>"
+    "<option value='1'"
+  );
+
+  if (runtimeSettings.metricUnits) {
+    page += " selected";
+  }
+
+  page += F(
+    ">Meters / km</option>"
+    "</select>"
     "</div>"
   );
 
@@ -1388,6 +1426,9 @@ void handleConfigSave() {
   runtimeSettings.autoScreenSwitch =
     configServer.hasArg("autosw");
 
+  runtimeSettings.metricUnits =
+    configServer.arg("units") == "1";
+
   runtimeSettings.buzzerEnabled =
     configServer.hasArg("buzz");
 
@@ -1522,6 +1563,9 @@ void handleRestoreDefaults() {
 
   runtimeSettings.autoScreenSwitch =
     DEFAULT_AUTO_SCREEN_SWITCH;
+
+  runtimeSettings.metricUnits =
+    DEFAULT_METRIC_UNITS;
 
   runtimeSettings.buzzerEnabled =
     DEFAULT_BUZZER_ENABLED;
