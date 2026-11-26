@@ -100,7 +100,7 @@ constexpr bool DEFAULT_AUTO_SCREEN_SWITCH = false;
 // BUZZER
 // ============================================================
 
-constexpr bool DEFAULT_BUZZER_ENABLED = false;
+constexpr bool DEFAULT_BUZZER_ENABLED = true;
 
 // Index into CHIME_TONE_NAMES below.
 constexpr int DEFAULT_CHIME_TONE = 0;
