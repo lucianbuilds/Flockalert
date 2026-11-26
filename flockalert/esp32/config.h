@@ -52,8 +52,8 @@ constexpr unsigned long BOOT_DEBOUNCE_MS = 50;
 constexpr const char* CONFIG_AP_SSID =
   "GPS-ALPR-Config";
 
-constexpr const char* CONFIG_AP_PASSWORD =
-  "gpsconfig";
+// The portal password is unique per board; see configApPassword()
+// in configportal.h. It is shown on the OLED in config mode.
 
 constexpr uint8_t CONFIG_AP_CHANNEL = 1;
 
@@ -101,6 +101,26 @@ constexpr bool DEFAULT_AUTO_SCREEN_SWITCH = false;
 constexpr bool DEFAULT_METRIC_UNITS = false;
 
 constexpr double DISTANCE_SWITCH_FEET = 2000.0;
+
+
+// ============================================================
+// SMARTER ALERTS
+// ============================================================
+
+// Above this speed, GPS heading is trusted and only cameras ahead
+// of the car (and not facing a cross street) can trigger an alert.
+constexpr double DIRECTION_FILTER_MIN_MPH = 8.0;
+
+// A camera counts as "ahead" within this many degrees of heading.
+constexpr double AHEAD_CONE_DEGREES = 60.0;
+
+// Cameras whose facing differs from the heading by more than this
+// (and less than 180 minus this) watch a cross street and are skipped.
+constexpr double CROSS_STREET_DEGREES = 45.0;
+
+// Cameras this close to the last counted one are the same site and
+// do not add to the counters or chime again.
+constexpr double CLUSTER_RADIUS_M = 15.0;
 
 
 // ============================================================

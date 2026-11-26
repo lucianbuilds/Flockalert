@@ -42,6 +42,12 @@ const ChimeSequence chimeSequences[CHIME_TONE_COUNT] = {
 };
 
 
+// Speed cameras always use this distinct triple beep, so they can be
+// told apart from ALPRs by ear.
+const ChimeSequence speedCamChime =
+  { 5, { { 700, 90 }, { 0, 60 }, { 700, 90 }, { 0, 60 }, { 700, 90 } } };
+
+
 // ============================================================
 // PLAYER STATE
 // ============================================================
@@ -52,6 +58,8 @@ uint8_t chimeNoteIndex = 0;
 
 unsigned long chimeNoteStartMs = 0;
 
+const ChimeSequence* activeChime = nullptr;
+
 
 // ============================================================
 // PLAYER
@@ -60,7 +68,7 @@ unsigned long chimeNoteStartMs = 0;
 static void playChimeNote() {
 
   const ChimeSequence& seq =
-    chimeSequences[runtimeSettings.chimeTone];
+    *activeChime;
 
   const ChimeNote& note =
     seq.notes[chimeNoteIndex];
@@ -77,11 +85,15 @@ static void playChimeNote() {
 
 // Called when a new ALPR alert starts. Does nothing when the
 // buzzer is disabled in configuration.
-void startChime() {
+void startChime(bool speedCam) {
 
   if (!runtimeSettings.buzzerEnabled) {
     return;
   }
+
+  activeChime = speedCam
+    ? &speedCamChime
+    : &chimeSequences[runtimeSettings.chimeTone];
 
   chimeNoteIndex = 0;
 
@@ -99,7 +111,7 @@ void updateBuzzer() {
   }
 
   const ChimeSequence& seq =
-    chimeSequences[runtimeSettings.chimeTone];
+    *activeChime;
 
   const ChimeNote& note =
     seq.notes[chimeNoteIndex];

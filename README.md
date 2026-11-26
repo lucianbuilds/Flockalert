@@ -12,7 +12,7 @@ The device also works as a compact GPS speedometer and has a built-in Wi-Fi conf
 
 ## Features
 
-- Live GPS speed in MPH
+- Live GPS speed in MPH or km/h
 - Nearest stored coordinate and current latitude/longitude
 - Visual proximity alert when within the configured alert distance
 - Separate persistent `ALPRs passed` and `Speed cams passed` counters stored in ESP32 non-volatile storage
@@ -130,7 +130,7 @@ Use a **passive** piezo buzzer, which needs a signal to make sound. Connect its 
    | Setting | Value |
    | --- | --- |
    | Network name | `GPS-ALPR-Config` |
-   | Password | `gpsconfig` |
+   | Password | Unique to each board (`gps-` + 6 characters), shown on the OLED |
    | Configuration address | `http://192.168.4.1` |
 
 4. Open `http://192.168.4.1` in a browser.
@@ -180,6 +180,19 @@ Keep coordinates in decimal degrees. Latitude is listed first, followed by longi
 ```
 
 Use `-FromClipboard` instead of `-InputFile` if you copied the Data tab. Red-light cameras can be turned on in the query.
+
+### Uploading camera data over Wi-Fi
+
+You can load new camera data without rebuilding the firmware. Open the configuration page and use **Upload Camera Data** to send the file saved from Overpass Turbo, unedited. It is stored on the ESP32's flash (LittleFS) and used instead of `coordinates.h` until you click **Use Built-in List**. Cameras are held in RAM, which fits roughly 15,000-20,000 entries. If a file is too large, the upload is rejected and the built-in list stays in use.
+
+## Smarter Alerts
+
+- **Direction-aware:** above 8 MPH, a camera only triggers an alert if it is ahead of you (within 60 degrees of your heading). Cameras mapped as facing a cross street are skipped. When you are slower or stopped, every camera counts.
+- **Camera clusters:** cameras within 15 m (50 ft) of the last one counted are treated as the same site, so a busy intersection counts and chimes once.
+- **Speed limits:** if a speed camera has a mapped limit, the alert bar shows it (`CAM 25MPH 350ft`) and the chime only plays when you are over it.
+- **Separate chime:** speed cameras always play a triple beep, so you can tell them from ALPRs by ear.
+
+The thresholds are in [config.h](flockalert/esp32/config.h) under `SMARTER ALERTS`.
 
 ## Default Settings
 

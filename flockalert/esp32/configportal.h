@@ -7,6 +7,20 @@
 #include <Preferences.h>
 
 #include "config.h"
+#include "cameras.h"
+
+// Wi-Fi password for the config portal, unique per board:
+// "gps-" + the last 6 hex digits of the chip MAC. Shown on the
+// OLED while the portal is open.
+const char* configApPassword() {
+  static char pw[16] = "";
+  if (!pw[0]) {
+    snprintf(pw, sizeof(pw), "gps-%06lx",
+      (unsigned long)(ESP.getEfuseMac() >> 24) & 0xFFFFFFUL);
+  }
+  return pw;
+}
+#define CONFIG_AP_PASSWORD configApPassword()
 
 // ============================================================
 // RUNTIME SETTINGS
@@ -524,7 +538,6 @@ void saveAlprCount() {
 }
 
 
-void startChime();
 
 
 void noteAlprPassed() {
@@ -532,8 +545,6 @@ void noteAlprPassed() {
   alprs_passed++;
 
   saveAlprCount();
-
-  startChime();
 
   Serial.print(
     "ALPR passed. Total: "
@@ -563,8 +574,6 @@ void noteSpeedCamPassed() {
   speedcams_passed++;
 
   saveSpeedCamCount();
-
-  startChime();
 
   Serial.print(
     "Speed cam passed. Total: "
@@ -682,6 +691,30 @@ String makeConfigPage() {
     "</form>"
     "</div>"
   );
+
+
+  // ----------------------------------------------------------
+  // CAMERA DATA
+  // ----------------------------------------------------------
+
+  page += F("<div class='card'><b>Cameras loaded:</b> ");
+  page += String(cameraCount);
+  page += camerasFromFile ? F(" (uploaded file)") : F(" (built-in list)");
+  page += F(
+    "<form action='/upload-cameras' method='POST' enctype='multipart/form-data'>"
+    "<label>Upload Overpass Turbo export (cameras.overpassql output)</label>"
+    "<input type='file' name='file' accept='.csv,.tsv,.txt' required>"
+    "<button type='submit'>Upload Camera Data</button>"
+    "</form>"
+  );
+  if (camerasFromFile) {
+    page += F(
+      "<form action='/reset-cameras' method='POST'>"
+      "<button type='submit'>Use Built-in List</button>"
+      "</form>"
+    );
+  }
+  page += F("</div>");
 
 
   // ----------------------------------------------------------
@@ -1665,6 +1698,19 @@ void startConfigPortal() {
     "/reset-speed-counter",
     HTTP_POST,
     handleResetSpeedCounter
+  );
+
+  configServer.on(
+    "/upload-cameras",
+    HTTP_POST,
+    handleCameraUploadDone,
+    handleCameraUploadData
+  );
+
+  configServer.on(
+    "/reset-cameras",
+    HTTP_POST,
+    handleCameraReset
   );
 
   configServer.on(

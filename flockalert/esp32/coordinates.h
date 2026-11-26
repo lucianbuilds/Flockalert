@@ -11,6 +11,8 @@ struct Waypoint {
   const char* name;
   double latitude;
   double longitude;
+  int16_t direction = -1;    // Degrees the camera faces, -1 = unknown
+  uint8_t maxspeedMph = 0;   // Speed camera limit, 0 = unknown
 };
 
 const Waypoint waypoints[] = {

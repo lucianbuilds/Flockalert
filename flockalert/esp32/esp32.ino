@@ -6,6 +6,7 @@
 
 #include "config.h"
 #include "coordinates.h"
+#include "cameras.h"
 #include "configportal.h"
 #include "buzzer.h"
 
@@ -64,12 +65,6 @@ unsigned long lastGPSStatusPrint = 0;
 bool gpsDataUsable();
 
 bool highwayModeActive();
-
-int findClosestWaypoint(
-  double latitude,
-  double longitude,
-  double &closestDistance
-);
 
 void initializeOLED();
 
@@ -216,77 +211,81 @@ void formatDistance(
 
 
 // ============================================================
-// FIND CLOSEST COORDINATE
+// SMARTER ALERTS
 // ============================================================
 
-int findClosestWaypoint(
-  double latitude,
-  double longitude,
-  double &closestDistance
-) {
+static double angleDiff(double a, double b) {
+  double d = fmod(fabs(a - b), 360.0);
+  return d > 180.0 ? 360.0 - d : d;
+}
 
-  closestDistance = 1e30;
+// Once the car is moving fast enough for GPS heading to be reliable,
+// skip cameras that are behind the car or watch a cross street.
+bool cameraRelevant(int index, double distanceM) {
 
-  int closestIndex = -1;
+  if (!gps.course.isValid() ||
+      !gps.speed.isValid() ||
+      gps.speed.mph() < DIRECTION_FILTER_MIN_MPH) {
+    return true;
+  }
 
+  double heading = gps.course.deg();
+  const Camera& c = cameras[index];
 
-  for (
-    size_t i = 0;
-    i < WAYPOINT_COUNT;
-    i++
-  ) {
-
-    double distance =
-      TinyGPSPlus::distanceBetween(
-        latitude,
-        longitude,
-        waypoints[i].latitude,
-        waypoints[i].longitude
-      );
-
-
-    if (
-      distance <
-      closestDistance
-    ) {
-
-      closestDistance =
-        distance;
-
-      closestIndex =
-        i;
+  // Very close cameras skip the "ahead" test: bearing is noisy there.
+  if (distanceM > 8.0) {
+    double bearing = TinyGPSPlus::courseTo(
+      gps.location.lat(), gps.location.lng(), c.lat, c.lon);
+    if (angleDiff(bearing, heading) > AHEAD_CONE_DEGREES) {
+      return false;
     }
   }
 
+  if (c.direction >= 0) {
+    double d = angleDiff(c.direction, heading);
+    if (d > CROSS_STREET_DEGREES && d < 180.0 - CROSS_STREET_DEGREES) {
+      return false;
+    }
+  }
 
-  return closestIndex;
+  return true;
 }
 
 
-// ============================================================
-// CAMERA TYPE
-// ============================================================
-
-// Entries named "Speed Cam..." (e.g. "Speed Camera", as written by
-// tools/overpass/make-coordinates.ps1) are speed cameras. Everything
-// else is treated as an ALPR.
-bool isSpeedCamera(int index) {
-
-  return index >= 0 &&
-    strncmp(
-      waypoints[index].name,
-      "Speed Cam",
-      9
-    ) == 0;
-}
-
+// Position of the last camera counted during the current alert,
+// used to treat a cluster of cameras as one site.
+float lastCountedLat = NAN;
+float lastCountedLon = NAN;
 
 void noteWaypointPassed(int index) {
 
-  if (isSpeedCamera(index)) {
+  const Camera& c = cameras[index];
+
+  if (!isnan(lastCountedLat) &&
+      fastDistanceM(lastCountedLat, lastCountedLon, c.lat, c.lon) <
+        CLUSTER_RADIUS_M) {
+    return;
+  }
+
+  lastCountedLat = c.lat;
+  lastCountedLon = c.lon;
+
+  bool speedCam = isSpeedCamera(index);
+
+  if (speedCam) {
     noteSpeedCamPassed();
   } else {
     noteAlprPassed();
+  }
+
+  // Speed cameras with a known limit only chime when over it.
+  bool overLimit =
+    c.limitMph == 0 ||
+    !gps.speed.isValid() ||
+    gps.speed.mph() > c.limitMph;
+
+  if (!speedCam || overLimit) {
+    startChime(speedCam);
   }
 }
 
@@ -312,10 +311,11 @@ void checkCoordinates() {
   double closestDistance;
 
   int closest =
-    findClosestWaypoint(
+    findClosestCamera(
       latitude,
       longitude,
-      closestDistance
+      closestDistance,
+      cameraRelevant
     );
 
 
@@ -403,7 +403,7 @@ void checkCoordinates() {
     );
 
     Serial.println(
-      waypoints[closest].name
+      cameraName(closest)
     );
 
 
@@ -463,12 +463,22 @@ void checkCoordinates() {
     }
 
 
+    double activeDistance =
+      fastDistanceM(
+        latitude,
+        longitude,
+        cameras[activeWaypoint].lat,
+        cameras[activeWaypoint].lon
+      );
+
     if (
-      closestDistance >
+      activeDistance >
       clearDistanceMeters
     ) {
 
       alertActive = false;
+
+      lastCountedLat = NAN;
 
       activeWaypoint = -1;
 
@@ -638,6 +648,14 @@ void updateDisplay() {
     ? gps.speed.mph()
     : 0.0;
 
+  double speedShown =
+    runtimeSettings.metricUnits
+    ? speedMPH * 1.609344
+    : speedMPH;
+
+  const char* speedUnit =
+    runtimeSettings.metricUnits ? "KMH" : "MPH";
+
   bool highwayMode =
     highwayModeActive();
 
@@ -649,16 +667,28 @@ void updateDisplay() {
   double closestDistance;
 
   int closest =
-    findClosestWaypoint(
+    findClosestCamera(
       latitude,
       longitude,
-      closestDistance
+      closestDistance,
+      cameraRelevant
     );
 
 
   double closestFeet =
     closestDistance *
     3.2808399;
+
+  // While alerting, show the distance to the active camera.
+  if (alertActive && activeWaypoint >= 0) {
+    closestFeet =
+      fastDistanceM(
+        latitude,
+        longitude,
+        cameras[activeWaypoint].lat,
+        cameras[activeWaypoint].lon
+      ) * 3.2808399;
+  }
 
 
   // ==========================================================
@@ -714,7 +744,7 @@ void updateDisplay() {
 
 
     const char* name =
-      waypoints[activeWaypoint].name;
+      cameraName(activeWaypoint);
 
 
     const int maxNameChars = 21;
@@ -769,8 +799,9 @@ void updateDisplay() {
     snprintf(
       speedText,
       sizeof(speedText),
-      "%.1f MPH",
-      speedMPH
+      "%.1f %s",
+      speedShown,
+      speedUnit
     );
 
 
@@ -815,7 +846,7 @@ void updateDisplay() {
     speedText,
     sizeof(speedText),
     "%.1f",
-    speedMPH
+    speedShown
   );
 
 
@@ -866,7 +897,7 @@ void updateDisplay() {
   );
 
   display.print(
-    "MPH"
+    speedUnit
   );
 
 
@@ -935,11 +966,30 @@ void updateDisplay() {
       54
     );
 
-    display.print(
-      isSpeedCamera(activeWaypoint)
-      ? "SPEED CAM "
-      : "ALPR NEAR "
-    );
+    uint8_t limit =
+      cameras[activeWaypoint].limitMph;
+
+    if (isSpeedCamera(activeWaypoint) && limit > 0) {
+
+      // e.g. "CAM 25MPH 350ft"
+      display.print("CAM ");
+      display.print(
+        runtimeSettings.metricUnits
+        ? (int)lround(limit * 1.609344)
+        : (int)limit
+      );
+      display.print(
+        runtimeSettings.metricUnits ? "KMH " : "MPH "
+      );
+
+    } else {
+
+      display.print(
+        isSpeedCamera(activeWaypoint)
+        ? "SPEED CAM "
+        : "ALPR NEAR "
+      );
+    }
 
     display.print(
       distanceText
@@ -1138,6 +1188,8 @@ void setup() {
 
   loadPersistentConfig();
 
+  loadCameraDatabase();
+
 
   // ----------------------------------------------------------
   // GPS
@@ -1237,7 +1289,7 @@ void setup() {
   );
 
   display.println(
-    WAYPOINT_COUNT
+    cameraCount
   );
 
 

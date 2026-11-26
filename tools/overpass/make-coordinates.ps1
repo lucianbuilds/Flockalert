@@ -3,7 +3,7 @@
   Turns the output of cameras.overpassql into flockalert/esp32/coordinates.h.
 
 .DESCRIPTION
-  Reads the tab-separated name/lat/lon rows that Overpass Turbo returns
+  Reads the tab-separated name/lat/lon/direction/maxspeed rows that Overpass Turbo returns
   and writes a complete coordinates.h, replacing the existing file.
   Use git to compare or undo.
 
@@ -31,6 +31,23 @@ if ($FromClipboard) {
 
 $rows = ($text -split "\r?\n" | Where-Object { $_.Trim() }) | ConvertFrom-Csv -Delimiter "`t"
 $inv = [Globalization.CultureInfo]::InvariantCulture
+$points = 'N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'
+
+# Same rules as parseDirection() / parseLimitMph() in cameras.h.
+function Get-Direction([string]$s) {
+  $s = "$s".Trim()
+  if ($s -match '^-?\d+') { return ((([int]$Matches[0]) % 360) + 360) % 360 }
+  $m = [regex]::Match($s, '^[A-Za-z]{1,3}').Value.ToUpper()
+  $i = [array]::IndexOf($points, $m)
+  if ($i -ge 0) { return [int][math]::Floor($i * 22.5 + 0.5) }
+  return -1
+}
+function Get-LimitMph([string]$s) {
+  if ("$s" -notmatch '^\s*(\d+)') { return 0 }
+  $v = [int]$Matches[1]
+  if ($s -match 'mph') { return [math]::Min($v, 255) }
+  return [math]::Min(255, [int][math]::Round($v * 0.621371))
+}
 $fmt = 'F' + $Decimals
 $seen = @{}
 $lines = foreach ($r in $rows) {
@@ -41,7 +58,9 @@ $lines = foreach ($r in $rows) {
   $key = "$name|$lat|$lon"
   if ($seen.ContainsKey($key)) { continue }
   $seen[$key] = $true
-  "  { `"$name`", $lat, $lon },"
+  $dir = Get-Direction $r.direction
+  $mph = Get-LimitMph $r.maxspeed
+  "  { `"$name`", $lat, $lon, $dir, $mph },"
 }
 
 if (-not $lines) { throw 'No rows found. Is this the output of cameras.overpassql?' }
@@ -60,6 +79,8 @@ struct Waypoint {
   const char* name;
   double latitude;
   double longitude;
+  int16_t direction = -1;    // Degrees the camera faces, -1 = unknown
+  uint8_t maxspeedMph = 0;   // Speed camera limit, 0 = unknown
 };
 
 const Waypoint waypoints[] = {
